@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini Perspective Shift Workbook</title>
+  <meta name="description" content="An interactive Gemini Season workbook for perspective shifts, affirmations, journaling, and tarot reflection." />
+
+  <!-- Tailwind CDN keeps this as a single drop-in HTML file for GitHub Pages. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React + Babel CDN so this can run as one standalone HTML file. -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #F8F0E8;
+    }
+
+    textarea,
+    input,
+    button {
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 44px;
+    }
+
+    a {
+      cursor: pointer;
+    }
+
+    ::selection {
+      background: #F6C777;
+      color: #2D2B44;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useEffect, useMemo, useState } = React;
+
+    const STORAGE_KEY = "gemini-perspective-shift-workbook-v1";
+
+    const tabs = [
+      { id: "overview", label: "Overview", icon: "☿" },
+      { id: "beliefs", label: "Beliefs", icon: "🦋" },
+      { id: "rewrite", label: "Rewrite", icon: "✍️" },
+      { id: "affirm", label: "Affirm", icon: "☀️" },
+      { id: "moon", label: "Full Moon", icon: "🏹" },
+      { id: "journal", label: "Journal", icon: "📖" },
+      { id: "tarot", label: "Tarot Spread", icon: "🔮" },
+    ];
+
+    const defaultState = {
+      intention: "",
+      groundingPractice: "",
+      bodyCheck: "",
+      oldBeliefs: [
+        { belief: "", origin: "", replacement: "" },
+        { belief: "", origin: "", replacement: "" },
+        { belief: "", origin: "", replacement: "" },
+      ],
+      stories: [
+        { old: "", affirmation: "" },
+        { old: "", affirmation: "" },
+        { old: "", affirmation: "" },
+        { old: "", affirmation: "" },
+      ],
+      affirmationSeed: "",
+      futureSelf: "",
+      stairStep: "",
+      finalMantra: "",
+      affirmationFeel: "",
+      fearBody: "",
+      presentPractices: "",
+      fearEvidence: "",
+      newRealities: "",
+      potentialIdeas: "",
+      limitsToRelease: "",
+      connectionSupport: "",
+      tarot: {
+        grounding: "",
+        limitingBelief: "",
+        communication: "",
+        newUnderstanding: "",
+        newIdeas: "",
+        higherBelief: "",
+        connect: "",
+        manifestation: "",
+      },
+      closingReflection: "",
+    };
+
+    function loadSavedState() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return defaultState;
+
+        const parsed = JSON.parse(stored);
+
+        return {
+          ...defaultState,
+          ...parsed,
+          tarot: {
+            ...defaultState.tarot,
+            ...(parsed.tarot || {}),
+          },
+          oldBeliefs: parsed.oldBeliefs || defaultState.oldBeliefs,
+          stories: parsed.stories || defaultState.stories,
+        };
+      } catch (error) {
+        console.warn("Could not load workbook state", error);
+        return defaultState;
+      }
+    }
+
+    function TextArea({ label, value, onChange, placeholder, rows = 4, helper }) {
+      return (
+        <label className="block space-y-2">
+          <div className="flex items-end justify-between gap-3">
+            <span className="text-sm font-semibold tracking-[0.16em] uppercase text-[#7A5473]">{label}</span>
+          </div>
+          {helper && <p className="text-sm leading-relaxed text-[#6B6270]">{helper}</p>}
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            rows={rows}
+            className="w-full resize-y rounded-2xl border border-[#E7D6C8] bg-white/75 px-4 py-3 text-[15px] leading-relaxed text-[#272437] shadow-sm outline-none transition focus:border-[#D89655] focus:bg-white focus:ring-4 focus:ring-[#F7D9A9]/40"
+          />
+        </label>
+      );
+    }
+
+    function Input({ label, value, onChange, placeholder }) {
+      return (
+        <label className="block space-y-2">
+          <span className="text-sm font-semibold tracking-[0.16em] uppercase text-[#7A5473]">{label}</span>
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full rounded-2xl border border-[#E7D6C8] bg-white/75 px-4 py-3 text-[15px] text-[#272437] shadow-sm outline-none transition focus:border-[#D89655] focus:bg-white focus:ring-4 focus:ring-[#F7D9A9]/40"
+          />
+        </label>
+      );
+    }
+
+    function Card({ children, className = "" }) {
+      return (
+        <section className={`rounded-[2rem] border border-white/70 bg-white/72 p-5 shadow-[0_18px_60px_rgba(80,57,94,0.12)] backdrop-blur md:p-7 ${className}`}>
+          {children}
+        </section>
+      );
+    }
+
+    function SectionTitle({ eyebrow, title, children }) {
+      return (
+        <div className="mb-6 space-y-3">
+          {eyebrow && <p className="text-sm font-bold tracking-[0.24em] uppercase text-[#D48845]">{eyebrow}</p>}
+          <h2 className="font-serif text-3xl leading-tight text-[#2D2B44] md:text-4xl">{title}</h2>
+          {children && <p className="max-w-3xl text-base leading-relaxed text-[#615A69]">{children}</p>}
+        </div>
+      );
+    }
+
+    function Pill({ children }) {
+      return <span className="rounded-full border border-[#E9D2B4] bg-[#FFF8EC] px-3 py-1 text-sm font-medium text-[#7B4B35]">{children}</span>;
+    }
+
+    function GeminiGlyph() {
+      return (
+        <div className="relative mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#FFF0BE] via-[#F6D5A1] to-[#D9C2ED] shadow-[0_20px_50px_rgba(216,150,85,0.25)]">
+          <div className="absolute -left-3 top-3 text-3xl">🦋</div>
+          <div className="absolute -right-2 bottom-3 text-2xl">✦</div>
+          <span className="font-serif text-5xl text-[#3C345D]">♊︎</span>
+        </div>
+      );
+    }
+
+    function makeCopyText(data) {
+      const oldBeliefs = data.oldBeliefs
+        .map((row, index) => `${index + 1}. Old belief / identity: ${row.belief || "—"}\n   Origin: ${row.origin || "—"}\n   Replacement belief: ${row.replacement || "—"}`)
+        .join("\n");
+
+      const stories = data.stories
+        .map((row, index) => `${index + 1}. Old programming: ${row.old || "—"}\n   New affirmation: ${row.affirmation || "—"}`)
+        .join("\n");
+
+      const tarot = Object.entries(data.tarot)
+        .map(([key, value]) => `${key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}: ${value || "—"}`)
+        .join("\n");
+
+      return `Gemini Season Perspective Shift Workbook\n\nINTENTION\n${data.intention || "—"}\n\nGROUNDING\nBody check: ${data.bodyCheck || "—"}\nGrounding practice: ${data.groundingPractice || "—"}\n\nBELIEF SHIFT\n${oldBeliefs}\n\nREWRITING OLD STORIES\n${stories}\n\nAFFIRMATION / MANTRA\nAffirmation seed: ${data.affirmationSeed || "—"}\nFuture self says: ${data.futureSelf || "—"}\nStair-step phrase: ${data.stairStep || "—"}\nFinal mantra: ${data.finalMantra || "—"}\nHow it feels aloud: ${data.affirmationFeel || "—"}\n\nFULL MOON IN SAGITTARIUS\nWhere fear lives in my body: ${data.fearBody || "—"}\nPractices that bring me present: ${data.presentPractices || "—"}\nEvidence my fears are false: ${data.fearEvidence || "—"}\nNew realities I am open to exploring: ${data.newRealities || "—"}\n\nJOURNAL PROMPTS\nNew ideas about my potential: ${data.potentialIdeas || "—"}\nWhat I need to let go of: ${data.limitsToRelease || "—"}\nHow connection supports me: ${data.connectionSupport || "—"}\n\nTAROT SPREAD\n${tarot}\n\nCLOSING REFLECTION\n${data.closingReflection || "—"}`;
+    }
+
+    function GeminiPerspectiveShiftWorkbook() {
+      const [activeTab, setActiveTab] = useState("overview");
+      const [data, setData] = useState(loadSavedState);
+      const [copied, setCopied] = useState(false);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (error) {
+          console.warn("Could not save workbook state", error);
+        }
+      }, [data]);
+
+      const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
+      const progress = useMemo(() => Math.round(((activeIndex + 1) / tabs.length) * 100), [activeIndex]);
+
+      const update = (key, value) => setData((prev) => ({ ...prev, [key]: value }));
+
+      const updateRow = (collection, index, key, value) => {
+        setData((prev) => {
+          const next = [...prev[collection]];
+          next[index] = { ...next[index], [key]: value };
+          return { ...prev, [collection]: next };
+        });
+      };
+
+      const updateTarot = (key, value) => {
+        setData((prev) => ({ ...prev, tarot: { ...prev.tarot, [key]: value } }));
+      };
+
+      const copyAll = async () => {
+        const text = makeCopyText(data);
+
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        } catch (error) {
+          const fallback = document.createElement("textarea");
+          fallback.value = text;
+          document.body.appendChild(fallback);
+          fallback.select();
+          document.execCommand("copy");
+          document.body.removeChild(fallback);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }
+      };
+
+      const resetWorkbook = () => {
+        const confirmed = window.confirm("Clear your saved workbook responses?");
+        if (!confirmed) return;
+        setData(defaultState);
+        localStorage.removeItem(STORAGE_KEY);
+      };
+
+      const goNext = () => setActiveTab(tabs[Math.min(activeIndex + 1, tabs.length - 1)].id);
+      const goBack = () => setActiveTab(tabs[Math.max(activeIndex - 1, 0)].id);
+
+      return (
+        <main className="min-h-screen overflow-hidden bg-[#F8F0E8] text-[#282337]">
+          <div className="pointer-events-none fixed inset-0 opacity-90">
+            <div className="absolute -left-28 top-8 h-72 w-72 rounded-full bg-[#F7D17C]/35 blur-3xl"></div>
+            <div className="absolute right-[-8rem] top-32 h-96 w-96 rounded-full bg-[#B79AD8]/30 blur-3xl"></div>
+            <div className="absolute bottom-[-8rem] left-1/3 h-80 w-80 rounded-full bg-[#E58A3E]/20 blur-3xl"></div>
+          </div>
+
+          <div className="relative mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+            <header className="mb-6 rounded-[2.5rem] border border-white/70 bg-white/65 p-5 shadow-[0_24px_80px_rgba(80,57,94,0.14)] backdrop-blur md:p-8">
+              <div className="grid gap-8 md:grid-cols-[1fr_1.5fr] md:items-center">
+                <div className="rounded-[2rem] bg-gradient-to-br from-[#FFF7DE] via-[#F9E1BC] to-[#E9D9F5] p-7 text-center shadow-inner">
+                  <GeminiGlyph />
+                  <p className="text-xs font-bold tracking-[0.28em] uppercase text-[#8B5E82]">Gemini Season</p>
+                  <h1 className="mt-3 font-serif text-4xl leading-tight text-[#2D2B44] md:text-5xl">Perspective Shift</h1>
+                  <p className="mt-3 text-sm font-semibold tracking-[0.18em] uppercase text-[#D48845]">Rewriting Your Story for Expansion</p>
+                </div>
+
+                <div>
+                  <p className="mb-3 text-sm font-bold tracking-[0.28em] uppercase text-[#D48845]">Interactive Handbook</p>
+                  <h2 className="font-serif text-3xl leading-tight text-[#2D2B44] md:text-5xl">A guided workbook for curiosity, conscious communication, and new inner narratives.</h2>
+                  <p className="mt-4 max-w-2xl text-base leading-relaxed text-[#615A69]">
+                    Use this space to notice old programming, widen your perspective, create replacement beliefs, and speak a new story into motion.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Pill>Curiosity</Pill>
+                    <Pill>Perspective</Pill>
+                    <Pill>Communication</Pill>
+                    <Pill>Expansion</Pill>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            <nav className="sticky top-3 z-20 mb-6 rounded-[2rem] border border-white/70 bg-white/80 p-3 shadow-[0_16px_50px_rgba(80,57,94,0.12)] backdrop-blur-xl">
+              <div className="mb-3 h-2 overflow-hidden rounded-full bg-[#EFE3D8]">
+                <div className="h-full rounded-full bg-gradient-to-r from-[#E99445] via-[#F6C777] to-[#9F7DC2] transition-all duration-500" style={{ width: `${progress}%` }}></div>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                      activeTab === tab.id
+                        ? "bg-[#2D2B44] text-white shadow-lg shadow-[#2D2B44]/20"
+                        : "bg-[#FFF8EC] text-[#704F74] hover:bg-[#F4E5F8]"
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+
+            <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+              <div className="space-y-6">
+                {activeTab === "overview" && (
+                  <Card>
+                    <SectionTitle eyebrow="Begin here" title="Let the season ask better questions.">
+                      Gemini energy moves quickly, so this page begins with grounding. Before you start rewriting the story, pause long enough to hear the one you are already telling.
+                    </SectionTitle>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <TextArea
+                        label="My intention for this workbook"
+                        value={data.intention}
+                        onChange={(value) => update("intention", value)}
+                        placeholder="This season, I am opening my mind to..."
+                        rows={5}
+                      />
+
+                      <TextArea
+                        label="Body check"
+                        value={data.bodyCheck}
+                        onChange={(value) => update("bodyCheck", value)}
+                        placeholder="What is my body telling me right now? Where do I feel open, tense, curious, or guarded?"
+                        rows={5}
+                      />
+                    </div>
+
+                    <div className="mt-5">
+                      <TextArea
+                        label="Grounding practice"
+                        value={data.groundingPractice}
+                        onChange={(value) => update("groundingPractice", value)}
+                        placeholder="Breath, movement, a walk, hand on heart, nervous system care..."
+                        helper="Gemini brings information from every direction. Choose one grounding practice that helps you stay connected to your breath while your perspective shifts."
+                      />
+                    </div>
+                  </Card>
+                )}
+
+                {activeTab === "beliefs" && (
+                  <Card>
+                    <SectionTitle eyebrow="Changing your perception" title="Name the belief, trace the origin, choose the replacement.">
+                      Lead with curiosity. This is not a page for judgment; it is a place to notice what was learned so it can be gently unlearned.
+                    </SectionTitle>
+
+                    <div className="space-y-5">
+                      {data.oldBeliefs.map((row, index) => (
+                        <div key={index} className="rounded-[1.5rem] border border-[#EAD9CA] bg-[#FFF9F1]/80 p-4">
+                          <h3 className="mb-4 font-serif text-2xl text-[#3B3454]">Belief {index + 1}</h3>
+
+                          <div className="grid gap-4 md:grid-cols-3">
+                            <TextArea
+                              label="Belief or identity"
+                              value={row.belief}
+                              onChange={(value) => updateRow("oldBeliefs", index, "belief", value)}
+                              placeholder="I am... / I always... / I can't..."
+                              rows={4}
+                            />
+
+                            <TextArea
+                              label="Where it may come from"
+                              value={row.origin}
+                              onChange={(value) => updateRow("oldBeliefs", index, "origin", value)}
+                              placeholder="Family pattern, old experience, repeated evidence, protection strategy..."
+                              rows={4}
+                            />
+
+                            <TextArea
+                              label="Replacement belief"
+                              value={row.replacement}
+                              onChange={(value) => updateRow("oldBeliefs", index, "replacement", value)}
+                              placeholder="I am becoming... / I now choose... / It is possible that..."
+                              rows={4}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {activeTab === "rewrite" && (
+                  <Card>
+                    <SectionTitle eyebrow="Rewriting old stories" title="Update the inner narrative.">
+                      Put the old programming beside the new affirmation. Keep the new language brief, specific, believable, and alive enough to practice.
+                    </SectionTitle>
+
+                    <div className="overflow-hidden rounded-[1.5rem] border border-[#EAD9CA] bg-white/65">
+                      <div className="grid grid-cols-2 bg-[#3B3454] text-sm font-bold uppercase tracking-[0.16em] text-white">
+                        <div className="p-4">Old Programming</div>
+                        <div className="p-4">New Affirmation</div>
+                      </div>
+
+                      {data.stories.map((row, index) => (
+                        <div key={index} className="grid grid-cols-1 gap-0 border-t border-[#EAD9CA] md:grid-cols-2">
+                          <div className="border-b border-[#EAD9CA] p-3 md:border-b-0 md:border-r">
+                            <TextArea
+                              label={`Story ${index + 1}`}
+                              value={row.old}
+                              onChange={(value) => updateRow("stories", index, "old", value)}
+                              placeholder="The outdated story I have been carrying..."
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="p-3">
+                            <TextArea
+                              label="Updated story"
+                              value={row.affirmation}
+                              onChange={(value) => updateRow("stories", index, "affirmation", value)}
+                              placeholder="The new belief I am practicing..."
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {activeTab === "affirm" && (
+                  <Card>
+                    <SectionTitle eyebrow="Writing a mantra or affirmation" title="Shape the words your future self can actually believe.">
+                      Present tense. Positive language. Brief and specific. If the final affirmation feels too far away, soften it with a stair-step phrase.
+                    </SectionTitle>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <Input
+                        label="Start with: I am..."
+                        value={data.affirmationSeed}
+                        onChange={(value) => update("affirmationSeed", value)}
+                        placeholder="I am..."
+                      />
+
+                      <Input
+                        label="Future self language"
+                        value={data.futureSelf}
+                        onChange={(value) => update("futureSelf", value)}
+                        placeholder="My future self is thinking and saying..."
+                      />
+
+                      <Input
+                        label="Stair-step phrase"
+                        value={data.stairStep}
+                        onChange={(value) => update("stairStep", value)}
+                        placeholder="It is possible that... / I am ready to believe..."
+                      />
+
+                      <Input
+                        label="Final mantra"
+                        value={data.finalMantra}
+                        onChange={(value) => update("finalMantra", value)}
+                        placeholder="My voice is valuable and I use it with confidence."
+                      />
+                    </div>
+
+                    <div className="mt-5">
+                      <TextArea
+                        label="How does it feel when spoken aloud?"
+                        value={data.affirmationFeel}
+                        onChange={(value) => update("affirmationFeel", value)}
+                        placeholder="Does it feel inspiring, grounded, light, believable, energizing? What needs adjusting?"
+                      />
+                    </div>
+                  </Card>
+                )}
+
+                {activeTab === "moon" && (
+                  <Card>
+                    <SectionTitle eyebrow="Full Moon in Sagittarius" title="Open to new realities.">
+                      Sagittarius invites adventure, expansion, study, faith, and a willingness to step beyond familiar narratives. Use these prompts to notice where fear asks for grounding and where your story asks for more space.
+                    </SectionTitle>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <TextArea
+                        label="Where does fear live in my body?"
+                        value={data.fearBody}
+                        onChange={(value) => update("fearBody", value)}
+                        placeholder="What areas tense up when I feel fear?"
+                      />
+
+                      <TextArea
+                        label="What brings me present?"
+                        value={data.presentPractices}
+                        onChange={(value) => update("presentPractices", value)}
+                        placeholder="Breath, movement, water, prayer, stretching, grounding..."
+                      />
+
+                      <TextArea
+                        label="What evidence says my fears are false?"
+                        value={data.fearEvidence}
+                        onChange={(value) => update("fearEvidence", value)}
+                        placeholder="What truth, pattern, result, or lived evidence can I return to?"
+                      />
+
+                      <TextArea
+                        label="Am I open to explore new realities?"
+                        value={data.newRealities}
+                        onChange={(value) => update("newRealities", value)}
+                        placeholder="A new possibility I am willing to consider is..."
+                      />
+                    </div>
+                  </Card>
+                )}
+
+                {activeTab === "journal" && (
+                  <Card>
+                    <SectionTitle eyebrow="Journal prompts" title="Widen the story of your potential.">
+                      These prompts help you name what can expand, what can be released, and how connection can support your next version.
+                    </SectionTitle>
+
+                    <div className="space-y-5">
+                      <TextArea
+                        label="How can I open my mind to new ideas about my potential?"
+                        value={data.potentialIdeas}
+                        onChange={(value) => update("potentialIdeas", value)}
+                        rows={5}
+                      />
+
+                      <TextArea
+                        label="What do I need to let go of that limits me?"
+                        value={data.limitsToRelease}
+                        onChange={(value) => update("limitsToRelease", value)}
+                        rows={5}
+                      />
+
+                      <TextArea
+                        label="How can connecting with others support my becoming?"
+                        value={data.connectionSupport}
+                        onChange={(value) => update("connectionSupport", value)}
+                        rows={5}
+                      />
+                    </div>
+                  </Card>
+                )}
+
+                {activeTab === "tarot" && (
+                  <Card>
+                    <SectionTitle eyebrow="Gemini Season Tarot Spread" title="Eight cards for perception, communication, and new understanding.">
+                      Pull one card for each position. Let the spread show where your story is shifting, what belief is ready to evolve, and what you are ready to speak into being.
+                    </SectionTitle>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {[
+                        ["grounding", "Grounding"],
+                        ["limitingBelief", "Limiting Belief"],
+                        ["communication", "Communication"],
+                        ["newUnderstanding", "New Understanding"],
+                        ["newIdeas", "New Ideas"],
+                        ["higherBelief", "Align with Higher Belief"],
+                        ["connect", "Connect with Others"],
+                        ["manifestation", "Manifestation"],
+                      ].map(([key, label], index) => (
+                        <div key={key} className="rounded-[1.5rem] border border-[#EAD9CA] bg-[#FFF9F1]/80 p-4">
+                          <div className="mb-3 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#3B3454] font-serif text-lg text-white">{index + 1}</div>
+                            <h3 className="font-serif text-2xl text-[#3B3454]">{label}</h3>
+                          </div>
+
+                          <TextArea
+                            label="Card + notes"
+                            value={data.tarot[key]}
+                            onChange={(value) => updateTarot(key, value)}
+                            placeholder="Card pulled, symbols noticed, intuitive message..."
+                            rows={4}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-5">
+                      <TextArea
+                        label="Closing reflection"
+                        value={data.closingReflection}
+                        onChange={(value) => update("closingReflection", value)}
+                        placeholder="The story I am choosing now is..."
+                        rows={5}
+                      />
+                    </div>
+                  </Card>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-white/70 bg-white/70 p-4 shadow-[0_16px_45px_rgba(80,57,94,0.10)] backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    disabled={activeIndex === 0}
+                    className="rounded-full bg-[#FFF8EC] px-5 py-3 text-sm font-bold text-[#6F5278] transition hover:bg-[#F4E5F8] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ← Back
+                  </button>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={copyAll}
+                      className="rounded-full bg-[#D48845] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#D48845]/25 transition hover:-translate-y-0.5 hover:bg-[#BF7437]"
+                    >
+                      {copied ? "Copied ✨" : "Copy Workbook"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={goNext}
+                      disabled={activeIndex === tabs.length - 1}
+                      className="rounded-full bg-[#2D2B44] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#2D2B44]/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <aside className="space-y-5 lg:sticky lg:top-32 lg:self-start">
+                <Card className="p-5">
+                  <h3 className="font-serif text-2xl text-[#2D2B44]">Season Notes</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-[#615A69]">
+                    Gemini asks for curiosity, open-mindedness, and conscious communication. Return to breath when the mind starts spinning.
+                  </p>
+
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-2xl bg-[#FFF8EC] p-4">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#D48845]">Higher vibrations</p>
+                      <p className="mt-2 text-sm text-[#615A69]">Curiosity, widening perspective, learning, connection, open-mindedness.</p>
+                    </div>
+
+                    <div className="rounded-2xl bg-[#F8EFFB] p-4">
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8B5E82]">Watch for</p>
+                      <p className="mt-2 text-sm text-[#615A69]">Judgment, closed-mindedness, feeling ungrounded, fear, suppressed emotions.</p>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-5">
+                  <h3 className="font-serif text-2xl text-[#2D2B44]">Affirmation Reminders</h3>
+
+                  <ul className="mt-3 space-y-2 text-sm leading-relaxed text-[#615A69]">
+                    <li>• Write in present tense.</li>
+                    <li>• Keep it brief and specific.</li>
+                    <li>• Use positive language.</li>
+                    <li>• Make it believable enough to practice.</li>
+                    <li>• Let it feel dynamic, not flat.</li>
+                  </ul>
+                </Card>
+
+                <Card className="p-5">
+                  <h3 className="font-serif text-2xl text-[#2D2B44]">Quick Actions</h3>
+
+                  <div className="mt-4 grid gap-3">
+                    <button
+                      type="button"
+                      onClick={copyAll}
+                      className="rounded-full bg-[#D48845] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-[#D48845]/25 transition hover:-translate-y-0.5"
+                    >
+                      {copied ? "Copied to clipboard ✨" : "Copy all responses"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={resetWorkbook}
+                      className="rounded-full border border-[#E3CBB7] bg-white/70 px-5 py-3 text-sm font-bold text-[#704F74] transition hover:bg-[#FFF8EC]"
+                    >
+                      Reset workbook
+                    </button>
+                  </div>
+                </Card>
+              </aside>
+            </div>
+
+            <div className="mt-8 rounded-[2rem] border border-white/70 bg-white/55 p-5 text-center text-sm leading-relaxed text-[#6B6270] shadow-[0_16px_45px_rgba(80,57,94,0.08)] backdrop-blur">
+              <p className="font-serif text-xl text-[#2D2B44]">“I am learning, I am evolving, I am growing.”</p>
+            </div>
+
+            <footer className="relative z-10 mt-4 rounded-[2rem] border border-white/70 bg-white/55 p-5 text-center text-sm leading-relaxed text-[#6B6270] backdrop-blur">
+              <p className="font-semibold tracking-[0.16em] uppercase text-[#D48845]">Soul-Forged Founders</p>
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs font-bold uppercase tracking-[0.14em]">
+                <a
+                  href="https://www.sunnysink.com/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative z-10 text-[#7A5473] underline underline-offset-4 transition hover:text-[#D48845]"
+                >
+                  Privacy Policy
+                </a>
+
+                <span className="text-[#D8C1B4]">|</span>
+
+                <a
+                  href="https://www.sunnysink.com/terms-conditions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative z-10 text-[#7A5473] underline underline-offset-4 transition hover:text-[#D48845]"
+                >
+                  Terms & Conditions
+                </a>
+              </div>
+
+              <p className="mt-3 text-xs leading-relaxed text-[#7C7280]">
+                © 2026 S Sink Coaching<br />
+                PO Box 1651 Gillette, WY 82717-1651<br />
+                <a
+                  href="mailto:support@sunnysink.com"
+                  className="relative z-10 text-[#7A5473] underline underline-offset-4 transition hover:text-[#D48845]"
+                >
+                  support@sunnysink.com
+                </a>
+              </p>
+            </footer>
+          </div>
+        </main>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<GeminiPerspectiveShiftWorkbook />);
+  </script>
+</body>
+</html>
